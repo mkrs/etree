@@ -36,14 +36,16 @@ type Token interface {
 // its Child tokens.
 type Document struct {
 	Element
+	htmlEntities bool
 }
 
 // An Element represents an XML element, its attributes, and its child tokens.
 type Element struct {
-	Space, Tag string   // The element's namespace and tag
-	Attr       []Attr   // The element's key-value attribute pairs
-	Child      []Token  // The element's child tokens (elements, comments, etc.)
-	Parent     *Element // The element's parent element
+	Space, Tag   string   // The element's namespace and tag
+	Attr         []Attr   // The element's key-value attribute pairs
+	Child        []Token  // The element's child tokens (elements, comments, etc.)
+	Parent       *Element // The element's parent element
+	htmlEntities bool
 }
 
 // An Attr represents a key-value attribute of an XML element.
@@ -84,12 +86,17 @@ func CreateDocument(root *Element) *Document {
 
 // NewDocument creates an empty XML document and returns it.
 func NewDocument() *Document {
-	return &Document{Element{Child: make([]Token, 0)}}
+	return &Document{Element{Child: make([]Token, 0)}, false}
+}
+
+// Should the Document use convert HTML entities during reading
+func (d *Document) SetHtmlEntities(html bool) {
+	d.Element.htmlEntities = html
 }
 
 // Copy returns a recursive, deep copy of the document.
 func (d *Document) Copy() *Document {
-	return &Document{*(d.dup(nil).(*Element))}
+	return &Document{*(d.dup(nil).(*Element)), false}
 }
 
 // Root returns the root element of the document, or nil if there is no root
@@ -274,6 +281,9 @@ func (e *Element) RemoveElement(el *Element) *Element {
 func (e *Element) readFrom(ri io.Reader) (n int64, err error) {
 	r := newCountReader(ri)
 	dec := xml.NewDecoder(r)
+	if e.htmlEntities {
+		dec.Entity = xml.HTMLEntity
+	}
 	var stack stack
 	stack.push(e)
 	for {
